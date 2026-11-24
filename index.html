@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="author" content="Chris Clifford">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Pooka Sprint</title>
 <style>
@@ -800,6 +801,21 @@ function hud(){
   ctx.fillStyle=f<.3?'#ff4d4d':'#fff';rr(20,48,bw*f,12,6);ctx.fill();
 }
 
+function waveText(s,cx,cy,size,pal,delay=0,amp=1){
+  ctx.font=`900 ${size}px ${FONT}`;
+  const ch=[...s],ws=ch.map(c=>ctx.measureText(c).width),tot=ws.reduce((a,b)=>a+b,0);
+  let x=cx-tot/2;
+  ch.forEach((c,i)=>{
+    const k=clamp((G.t-delay-i*.06)/.45,0,1);
+    if(k>0){
+      const drop=-Math.pow(1-k,2)*320,wave=k<1?0:Math.sin(G.tt*4+i*.7)*7*amp;
+      ctx.save();ctx.translate(x+ws[i]/2,cy+drop+wave);ctx.rotate(Math.sin(G.tt*3+i)*.08*k);
+      txt(c,0,0,size,pal[i%pal.length]);ctx.restore();
+    }
+    x+=ws[i];
+  });
+}
+
 function draw(){
   ctx.save();
   ctx.fillStyle=(G.state==='title'||G.state==='over')?'#7b2ff7':G.def.bg;
@@ -811,15 +827,27 @@ function draw(){
   if(G.state==='result'&&!G.win&&G.t<.5)ctx.translate(rnd(-5,5),rnd(-5,5));
 
   if(G.state==='title'){
-    ctx.save();ctx.translate(180,150);ctx.rotate(Math.sin(G.tt*2)*.04);
-    txt('POOKA',0,0,70,'#ffe45e');txt('SPRINT',0,66,70,'#fff');ctx.restore();
-    COLS.slice(0,3).forEach((c,i)=>pooka(70+i*110,300+Math.sin(G.tt*3+i)*10,26,c,'h'));
-    pooka(180,410-Math.abs(Math.sin(G.tt*3))*30,48,'#ff6fb5','h');
-    txt('TAP TO START',180,490,26+Math.sin(G.tt*5)*2);
+    waveText('POOKA',180,105,72,['#ffe45e','#ff6fb5','#5ad1ff','#7ee081','#ffb703'],0);
+    waveText('SPRINT',180,175,72,['#ffffff','#ffe45e','#ffffff','#ffe45e','#ffffff','#ffe45e'],.35);
+    const ca=clamp((G.t-1.3)/.6,0,1);
+    ctx.save();ctx.globalAlpha=ca;
+    txt('A GAME BY',180,246,16,'#ffffff');
+    ctx.restore();
+    const nm='CHRIS CLIFFORD';
+    waveText(nm,180,278,28,[...nm].map((c,i)=>`hsl(${(G.tt*140+i*26)%360},95%,68%)`),1.3,.5);
+    if(ca>0){
+      ctx.save();ctx.globalAlpha=ca;
+      emo('✨',180+Math.cos(G.tt*2)*165,278+Math.sin(G.tt*3)*10,22);
+      emo('✨',180-Math.cos(G.tt*2)*165,278-Math.sin(G.tt*3)*10,22);
+      ctx.restore();
+    }
+    COLS.slice(0,3).forEach((c,i)=>pooka(70+i*110,350+Math.sin(G.tt*3+i)*10,24,c,'h'));
+    pooka(180,425-Math.abs(Math.sin(G.tt*3))*30,44,'#ff6fb5','h');
+    txt('TAP TO START',180,495,26+Math.sin(G.tt*5)*2);
     txt(G.best?'Best: '+G.best:'19 microgames + bosses. 4 lives.',180,530,18,'#ffe45e');
     emo(muted?'🔇':'🔊',328,32,26);
   }else if(G.state==='intro'){
-    if(G.banner)txt(G.banner,180,170,36,G.boss?'#ff5252':'#ffe45e');
+    if(G.banner)txt(G.banner,180+(G.boss?rnd(-3,3):0),170,36*(1+.1*Math.sin(G.tt*14)),G.boss?'#ff5252':'#ffe45e');
     const v=G.cur.verb||G.def.verb,k=Math.min(1,G.t/.15);
     const size=Math.min(64,340/(v.length*.66))*(.6+.4*k);
     txt(v,180,H/2-10,size);
@@ -841,7 +869,8 @@ function draw(){
     pooka(180,290,62,'#ff6fb5','s');
     txt('Score: '+G.score,180,400,34);
     txt(G.newBest?'NEW BEST!':'Best: '+G.best,180,445,24,'#ffe45e');
-    if(G.t>.6)txt('TAP TO RETRY',180,510,26+Math.sin(G.tt*5)*2);
+    if(G.t>.6)txt('TAP TO RETRY',180,500,26+Math.sin(G.tt*5)*2);
+    txt('Pooka Sprint by Chris Clifford',180,541,14,'#ffffff');
   }
   ctx.restore();
 }
