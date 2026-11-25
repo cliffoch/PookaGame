@@ -53,8 +53,6 @@ const jingleLose=()=>snd(220,.4,'sawtooth',.07,-140);
 let musicG=null,mTimer=null,mStep=0,mNext=0;
 const mf=m=>440*Math.pow(2,(m-69)/12);
 const MEL=[[72,76,79,76,72,76,79,84],[81,79,77,79,81,79,77,74],[72,76,79,76,72,76,79,84],[83,81,79,77,76,74,72,0]];
-const MELB=[[69,0,0,68,69,0,72,0],[71,0,0,70,71,0,74,0],[69,0,0,68,69,0,72,0],[75,74,72,71,69,68,66,0]];
-const bRoot=(b,st)=>[45,47,45,st<4?40:39][b];
 const mRoot=(b,st)=>[48,53,48,st<4?55:48][b];
 const mChord=(b,st)=>[[64,67],[65,69],[64,67],st<4?[62,67]:[64,67]][b];
 function mNote(f,t,d,type,v){
@@ -63,21 +61,83 @@ function mNote(f,t,d,type,v){
   g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);
   o.connect(g);g.connect(musicG);o.start(t);o.stop(t+d+.02);
 }
+/* ---- dark orchestral boss music (synthesised: strings, brass, timpani, bell, hall reverb) ---- */
+let bossBus=null,noiseBuf=null;
+function mkBossBus(){
+  const sr=AC.sampleRate,n=Math.floor(sr*2.4),ir=AC.createBuffer(2,n,sr);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.6)}
+  const conv=AC.createConvolver();conv.buffer=ir;
+  bossBus=AC.createGain();
+  const wet=AC.createGain(),dry=AC.createGain();wet.gain.value=.55;dry.gain.value=.8;
+  bossBus.connect(dry);dry.connect(musicG);bossBus.connect(conv);conv.connect(wet);wet.connect(musicG);
+  const nl=Math.floor(sr*.6);noiseBuf=AC.createBuffer(1,nl,sr);
+  const nd=noiseBuf.getChannelData(0);for(let i=0;i<nl;i++)nd[i]=Math.random()*2-1;
+}
+function oNote(f,t,d,o={}){
+  const{type='sawtooth',v=.02,att=.02,lp=1000,det=0}=o;
+  const osc=AC.createOscillator(),g=AC.createGain(),fl=AC.createBiquadFilter();
+  osc.type=type;osc.frequency.value=f;if(det)osc.detune.value=det;
+  fl.type='lowpass';fl.frequency.value=lp;
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+att);
+  g.gain.setValueAtTime(v,t+Math.max(att,d-.2));g.gain.linearRampToValueAtTime(.0001,t+d);
+  osc.connect(fl);fl.connect(g);g.connect(bossBus);osc.start(t);osc.stop(t+d+.05);
+}
+function timp(t,v){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type='sine';o.frequency.setValueAtTime(95,t);o.frequency.exponentialRampToValueAtTime(48,t+.3);
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.7);
+  o.connect(g);g.connect(bossBus);o.start(t);o.stop(t+.75);
+  const n=AC.createBufferSource(),ng=AC.createGain(),nf=AC.createBiquadFilter();
+  n.buffer=noiseBuf;nf.type='lowpass';nf.frequency.value=400;
+  ng.gain.setValueAtTime(v*.6,t);ng.gain.exponentialRampToValueAtTime(.0001,t+.12);
+  n.connect(nf);nf.connect(ng);ng.connect(bossBus);n.start(t);n.stop(t+.15);
+}
+function bell(t,f,v){
+  [[1,1],[2.01,.6],[2.76,.4],[4.1,.2]].forEach(([r,a])=>{
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type='sine';o.frequency.value=f*r;
+    g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v*a,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+3.6);
+    o.connect(g);g.connect(bossBus);o.start(t);o.stop(t+3.7);
+  });
+}
+/* C minor: Cm - Ab - Fm - G(b9), 104 bpm */
+const CHORDS=[[48,51,55,60],[44,51,56,60],[41,48,53,56],[43,47,53,56]];
+const CROOT=[48,44,41,43];
+const BRASS=[[60,0,0,0,63,0,62,0],[56,0,0,0,60,0,58,0],[65,0,63,0,61,0,60,0],[59,0,62,0,67,0,0,0]];
+const GALLOP=[1,0,1,1,1,0,1,1];
+function orchestra(bar,st,t,len){
+  if(st===0){
+    // string section: detuned saws, slow bloom
+    for(const n of CHORDS[bar])for(const d of[-9,9])oNote(mf(n),t,len*8.2,{v:.0055,att:.7,lp:1300,det:d});
+    if(bar===3)oNote(mf(84),t,len*8,{type:'sawtooth',v:.0035,att:1.2,lp:3200,det:6}); // eerie high violins
+    if(mStep%32===0)bell(t,98,.03);
+  }
+  // timpani on beats 1 and 3, roll into the loop
+  if(st===0||st===4)timp(t,.09);
+  if(bar===3&&st>=5)timp(t,.04+.02*(st-5));
+  // cellos/basses: galloping ostinato
+  if(GALLOP[st]){
+    const r=CROOT[bar];
+    oNote(mf(r),t,len*.9,{v:st===0?.04:.028,att:.012,lp:520});
+    oNote(mf(r-12),t,len*.9,{type:'sine',v:.03,att:.012,lp:300});
+  }
+  // low brass theme
+  const m=BRASS[bar][st];
+  if(m){
+    let j=st+1;while(j<8&&!BRASS[bar][j])j++;
+    const d=(j-st)*len*.95;
+    oNote(mf(m),t,d,{v:.02,att:.05,lp:1000});
+    oNote(mf(m-12),t,d,{v:.014,att:.05,lp:800});
+  }
+}
 function schedMusic(){
   if(!AC||!musicG)return;
   if(mNext<AC.currentTime)mNext=AC.currentTime+.05;
   while(mNext<AC.currentTime+.3){
     const bar=(mStep>>3)&3,st=mStep&7;
-    if(G.boss&&G.state!=='title'&&G.state!=='over'){
-      // sinister boss tune: slow minor creep, chromatic steps, tritone drone
-      const len=60/118/2,m=MELB[bar][st];
-      if(m)mNote(mf(m),mNext,len*1.6,'sawtooth',.016);
-      if(st===0||st===4){
-        mNote(mf(bRoot(bar,st)),mNext,len*3.2,'sawtooth',.03);
-        mNote(55,mNext,.2,'triangle',.07);
-      }
-      if(st===6&&(bar&1))mNote(mf(81),mNext,len*1.4,'square',.006);
-      mNext+=len;mStep++;continue;
+    if(G.boss&&bossBus&&G.state!=='title'&&G.state!=='over'){
+      orchestra(bar,st,mNext,60/104/2);
+      mNext+=60/104/2;mStep++;continue;
     }
     const bpm=Math.min(215,150+G.lv*6),len=60/bpm/2;
     const m=MEL[bar][st];
@@ -93,12 +153,14 @@ function startMusic(){
     if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();
     if(AC.state==='suspended')AC.resume();
     musicG=AC.createGain();musicG.gain.value=muted?0:1;musicG.connect(AC.destination);
+    try{mkBossBus()}catch(e){bossBus=null}
     mStep=0;mNext=AC.currentTime+.1;mTimer=setInterval(schedMusic,60);
   }catch(e){}
 }
 function stopMusic(){
   if(mTimer){clearInterval(mTimer);mTimer=null}
   if(musicG){try{musicG.disconnect()}catch(e){}musicG=null}
+  bossBus=null;
 }
 /* warning siren for the last moments of a game */
 let siren=null;
