@@ -312,8 +312,8 @@ const GAMES=[
 { // STOP
   verb:'STOP!',hint:'Tap when the line is in the green',bg:'#06d6a0',time:3.5,
   make(sp){
-    const hw=Math.max(22,34-(sp-1)*12);
-    return{m:30,dir:1,c:rnd(90,270),hw,speed:260*Math.min(1.5,1+(sp-1)*.5),col:pick(COLS),
+    const hw=Math.max(17,34-(sp-1)*16);
+    return{m:30,dir:1,c:rnd(90,270),hw,speed:260*Math.min(1.8,1+(sp-1)*.6),col:pick(COLS),
       update(dt){
         this.m+=this.dir*this.speed*dt;
         if(this.m>330){this.m=330;this.dir=-1}
