@@ -815,15 +815,17 @@ const GAMES=[
   }
 },
 { // SLICE
-  verb:'SLICE!',hint:'Swipe through 3 apples. Avoid bombs!',bg:'#2a9d8f',time:5.5,
+  verb:'SLICE!',hint:'Swipe through 3 apples. Avoid the bombs!',bg:'#2a9d8f',time:5.5,
   make(sp){
     return{need:3,got:0,os:[],tm:.2,dn:false,lx:null,ly:null,trail:[],n:0,
       update(dt){
         this.tm-=dt;
         if(this.tm<=0){
-          this.tm=.55/Math.min(1.3,sp);
-          const x=rnd(70,290);
-          this.os.push({x,y:H+30,vx:(180-x)*.45+rnd(-30,30),vy:-rnd(780,880),bomb:this.n++>0&&Math.random()<.25});
+          this.tm=.45/Math.min(1.3,sp);
+          const launch=bomb=>{const x=rnd(70,290);this.os.push({x,y:H+30,vx:(180-x)*.45+rnd(-30,30),vy:-rnd(780,880),bomb})};
+          // first throw is an apple, second is always a bomb, then ~40% bombs; sometimes a pair
+          launch(this.n===0?false:this.n===1?true:Math.random()<.4);this.n++;
+          if(this.n>2&&Math.random()<.3){launch(Math.random()<.5);this.n++}
         }
         for(const o of this.os){o.vy+=900*dt;o.x+=o.vx*dt;o.y+=o.vy*dt}
         this.os=this.os.filter(o=>!(o.y>H+40&&o.vy>0));
@@ -831,7 +833,10 @@ const GAMES=[
         this.trail=this.trail.filter(p=>p.t>0);
       },
       draw(){
-        for(const o of this.os)emo(o.bomb?'💣':'🍎',o.x,o.y,56);
+        for(const o of this.os){
+          if(o.bomb){ctx.strokeStyle='rgba(255,60,60,'+(.5+.4*Math.sin(G.tt*14))+')';ctx.lineWidth=5;ctx.beginPath();ctx.arc(o.x,o.y,38,0,7);ctx.stroke()}
+          emo(o.bomb?'💣':'🍎',o.x,o.y,56);
+        }
         if(this.trail.length>1){
           ctx.strokeStyle='#fff';ctx.lineWidth=7;ctx.lineCap='round';ctx.lineJoin='round';
           ctx.beginPath();this.trail.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
