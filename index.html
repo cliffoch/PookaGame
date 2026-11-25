@@ -53,6 +53,8 @@ const jingleLose=()=>snd(220,.4,'sawtooth',.07,-140);
 let musicG=null,mTimer=null,mStep=0,mNext=0;
 const mf=m=>440*Math.pow(2,(m-69)/12);
 const MEL=[[72,76,79,76,72,76,79,84],[81,79,77,79,81,79,77,74],[72,76,79,76,72,76,79,84],[83,81,79,77,76,74,72,0]];
+const MELB=[[69,0,0,68,69,0,72,0],[71,0,0,70,71,0,74,0],[69,0,0,68,69,0,72,0],[75,74,72,71,69,68,66,0]];
+const bRoot=(b,st)=>[45,47,45,st<4?40:39][b];
 const mRoot=(b,st)=>[48,53,48,st<4?55:48][b];
 const mChord=(b,st)=>[[64,67],[65,69],[64,67],st<4?[62,67]:[64,67]][b];
 function mNote(f,t,d,type,v){
@@ -66,7 +68,18 @@ function schedMusic(){
   if(mNext<AC.currentTime)mNext=AC.currentTime+.05;
   while(mNext<AC.currentTime+.3){
     const bar=(mStep>>3)&3,st=mStep&7;
-    const bpm=Math.min(215,150+G.lv*6+(G.boss?20:0)),len=60/bpm/2;
+    if(G.boss&&G.state!=='title'&&G.state!=='over'){
+      // sinister boss tune: slow minor creep, chromatic steps, tritone drone
+      const len=60/118/2,m=MELB[bar][st];
+      if(m)mNote(mf(m),mNext,len*1.6,'sawtooth',.016);
+      if(st===0||st===4){
+        mNote(mf(bRoot(bar,st)),mNext,len*3.2,'sawtooth',.03);
+        mNote(55,mNext,.2,'triangle',.07);
+      }
+      if(st===6&&(bar&1))mNote(mf(81),mNext,len*1.4,'square',.006);
+      mNext+=len;mStep++;continue;
+    }
+    const bpm=Math.min(215,150+G.lv*6),len=60/bpm/2;
     const m=MEL[bar][st];
     if(m)mNote(mf(m),mNext,len*.85,'square',.02);
     if(st===0||st===4)mNote(mf(mRoot(bar,st)),mNext,len*1.7,'triangle',.04);
@@ -80,8 +93,31 @@ function startMusic(){
     if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();
     if(AC.state==='suspended')AC.resume();
     musicG=AC.createGain();musicG.gain.value=muted?0:1;musicG.connect(AC.destination);
-    mNext=AC.currentTime+.1;mTimer=setInterval(schedMusic,60);
+    mStep=0;mNext=AC.currentTime+.1;mTimer=setInterval(schedMusic,60);
   }catch(e){}
+}
+function stopMusic(){
+  if(mTimer){clearInterval(mTimer);mTimer=null}
+  if(musicG){try{musicG.disconnect()}catch(e){}musicG=null}
+}
+/* warning siren for the last moments of a game */
+let siren=null;
+function startSiren(dur){
+  if(muted||!AC)return;
+  try{
+    const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();
+    o.type='sawtooth';o.frequency.setValueAtTime(600,t);
+    let tt=t,hi=false;
+    while(tt<t+dur){tt+=.25;hi=!hi;o.frequency.linearRampToValueAtTime(hi?1000:600,tt)}
+    g.gain.setValueAtTime(.045,t);g.gain.setValueAtTime(.045,t+Math.max(0,dur-.05));g.gain.linearRampToValueAtTime(.0001,t+dur);
+    o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+dur+.05);
+    siren={o,g};
+  }catch(e){}
+}
+function stopSiren(){
+  if(!siren)return;
+  try{siren.g.gain.cancelScheduledValues(AC.currentTime);siren.g.gain.setValueAtTime(.0001,AC.currentTime);siren.o.stop(AC.currentTime+.02)}catch(e){}
+  siren=null;
 }
 addEventListener('visibilitychange',()=>{
   try{if(!AC)return;if(document.hidden)AC.suspend();else if(!muted)AC.resume()}catch(e){}
@@ -124,7 +160,7 @@ const md=base=>G.state==='result'?(G.win?'h':'s'):base;
 
 function finish(win){
   if(G.state!=='play')return;
-  G.state='result';G.t=0;G.win=win;
+  G.state='result';G.t=0;G.win=win;stopSiren();
   if(win){G.score+=G.boss?5:1;if(G.boss)G.lives=Math.min(4,G.lives+1);jingleWin()}else{G.lives--;jingleLose()}
 }
 
@@ -1162,10 +1198,10 @@ function next(){
   G.boss=boss;G.lv=lv;G.def=def;G.cur=def.make(sp,lv,round/10);
   G.banner=boss?'BOSS ROUND!':(G.n>0&&G.n%4===0)?'SPEED UP!':'';
   G.tmax=G.tl=def.time*(boss?1:Math.max(.6,1-.05*lv));
-  G.n++;G.state='intro';G.t=0;snd(520,.12);
+  G.sirenOn=false;G.n++;G.state='intro';G.t=0;snd(520,.12);
 }
 function endGame(){
-  G.state='over';G.t=0;
+  G.state='over';G.t=0;stopMusic();stopSiren();
   if(G.score>G.best){G.best=G.score;G.newBest=G.score>0;try{localStorage.setItem('pookaBest',String(G.best))}catch(e){}}
 }
 
@@ -1179,6 +1215,7 @@ function frame(ts){
     if(G.cur.update)G.cur.update(dt);
     if(G.state==='play'){
       G.tl-=dt;
+      if(!G.sirenOn&&G.tl>0&&G.tl<=Math.min(1.1,G.tmax*.35)){G.sirenOn=true;startSiren(G.tl)}
       if(G.tl<=0){G.tl=0;finish(G.cur.timeout?G.cur.timeout():false)}
     }
   }else if(G.state==='result'){
