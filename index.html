@@ -49,6 +49,44 @@ function snd(f,d=.1,type='square',v=.06,slide=0){
 const jingleWin=()=>{snd(660,.1);setTimeout(()=>snd(880,.18),90);};
 const jingleLose=()=>snd(220,.4,'sawtooth',.07,-140);
 
+/* ---------- background tune (original, bouncy, low volume) ---------- */
+let musicG=null,mTimer=null,mStep=0,mNext=0;
+const mf=m=>440*Math.pow(2,(m-69)/12);
+const MEL=[[72,76,79,76,72,76,79,84],[81,79,77,79,81,79,77,74],[72,76,79,76,72,76,79,84],[83,81,79,77,76,74,72,0]];
+const mRoot=(b,st)=>[48,53,48,st<4?55:48][b];
+const mChord=(b,st)=>[[64,67],[65,69],[64,67],st<4?[62,67]:[64,67]][b];
+function mNote(f,t,d,type,v){
+  const o=AC.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  o.connect(g);g.connect(musicG);o.start(t);o.stop(t+d+.02);
+}
+function schedMusic(){
+  if(!AC||!musicG)return;
+  if(mNext<AC.currentTime)mNext=AC.currentTime+.05;
+  while(mNext<AC.currentTime+.3){
+    const bar=(mStep>>3)&3,st=mStep&7;
+    const bpm=Math.min(215,150+G.lv*6+(G.boss?20:0)),len=60/bpm/2;
+    const m=MEL[bar][st];
+    if(m)mNote(mf(m),mNext,len*.85,'square',.02);
+    if(st===0||st===4)mNote(mf(mRoot(bar,st)),mNext,len*1.7,'triangle',.04);
+    if(st===2||st===6)for(const c of mChord(bar,st))mNote(mf(c),mNext,len*.6,'square',.007);
+    mNext+=len;mStep++;
+  }
+}
+function startMusic(){
+  if(mTimer)return;
+  try{
+    if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended')AC.resume();
+    musicG=AC.createGain();musicG.gain.value=muted?0:1;musicG.connect(AC.destination);
+    mNext=AC.currentTime+.1;mTimer=setInterval(schedMusic,60);
+  }catch(e){}
+}
+addEventListener('visibilitychange',()=>{
+  try{if(!AC)return;if(document.hidden)AC.suspend();else if(!muted)AC.resume()}catch(e){}
+});
+
 /* ---------- drawing helpers ---------- */
 function txt(s,x,y,size,fill='#fff',stroke=INK,align='center'){
   ctx.font=`900 ${size}px ${FONT}`;ctx.textAlign=align;ctx.textBaseline='middle';
@@ -1114,7 +1152,7 @@ function drawBtns(vals,y,hl){
 function hitBtn(x,y,by){for(let i=0;i<3;i++)if(Math.abs(x-btnX(i))<54&&Math.abs(y-by)<44)return i;return -1}
 
 /* ---------- flow ---------- */
-function start(){G.score=0;G.lives=4;G.n=0;G.last=-1;G.newBest=false;next()}
+function start(){startMusic();G.score=0;G.lives=4;G.n=0;G.last=-1;G.newBest=false;next()}
 function next(){
   const round=G.n+1,boss=round%10===0;
   let def;
@@ -1152,7 +1190,7 @@ function frame(ts){
 
 function hud(){
   for(let i=0;i<4;i++)emo(i<G.lives?'❤️':'🖤',24+i*28,26,22);
-  txt(String(G.score),W-24,26,28,'#fff',INK,'right');
+  txt(String(G.score),W-46,26,28,'#fff',INK,'right');
   const bw=W-40;
   ctx.fillStyle='rgba(0,0,0,.3)';rr(20,48,bw,12,6);ctx.fill();
   const f=G.tl/G.tmax;
@@ -1203,7 +1241,6 @@ function draw(){
     pooka(180,425-Math.abs(Math.sin(G.tt*3))*30,44,'#ff6fb5','h');
     txt('TAP TO START',180,495,26+Math.sin(G.tt*5)*2);
     txt(G.best?'Best: '+G.best:'29 microgames + bosses. 4 lives.',180,530,18,'#ffe45e');
-    emo(muted?'🔇':'🔊',328,32,26);
   }else if(G.state==='intro'){
     if(G.banner)txt(G.banner,180+(G.boss?rnd(-3,3):0),170,36*(1+.1*Math.sin(G.tt*14)),G.boss?'#ff5252':'#ffe45e');
     const v=G.cur.verb||G.def.verb,k=Math.min(1,G.t/.15);
@@ -1230,6 +1267,7 @@ function draw(){
     if(G.t>.6)txt('TAP TO RETRY',180,500,26+Math.sin(G.tt*5)*2);
     txt('Pooka Sprint by Chris Clifford',180,541,14,'#ffffff');
   }
+  emo(muted?'🔇':'🔊',336,26,22);
   ctx.restore();
 }
 let mascotCol=COLS[0];
@@ -1239,7 +1277,8 @@ function pick2(){return G.cur&&G.cur.col?G.cur.col:mascotCol}
 function pos(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H]}
 cv.addEventListener('pointerdown',e=>{
   e.preventDefault();const[x,y]=pos(e);
-  if(G.state==='title'){if(x>296&&y<64){muted=!muted}else start()}
+  if(x>306&&y<44){muted=!muted;if(musicG)musicG.gain.value=muted?0:1;return}
+  if(G.state==='title')start();
   else if(G.state==='over'){if(G.t>.6)start()}
   else if(G.state==='play'&&G.cur.down)G.cur.down(x,y);
 });
