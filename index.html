@@ -283,7 +283,7 @@ const GAMES=[
   make(sp,lv){
     const n=Math.min(5,2+(Math.random()*3|0)+Math.min(2,lv>>1)),ev=[];let t=.3;
     for(let i=0;i<n;i++){ev.push({t,x:rnd(60,300),y:rnd(150,330),col:pick(COLS)});t+=rnd(.4,.55)/Math.min(1.25,sp)}
-    const opts=shuf([n,...shuf([n-2,n-1,n+1,n+2].filter(v=>v>=1)).slice(0,2)]);
+    const lows=[n-1,n-2].slice(0,Math.random()*3|0).filter(v=>v>=1),opts=shuf([n,...lows,...[n+1,n+2].slice(0,2-lows.length)]);
     return{n,ev,opts,showEnd:t+.1,t:0,
       update(dt){this.t+=dt},
       draw(){
