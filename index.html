@@ -5,6 +5,7 @@
 <meta name="author" content="Chris Clifford">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Pooka Sprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
 <style>
 html,body{margin:0;height:100%;background:#1b1230;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none;user-select:none;-webkit-user-select:none}
 canvas{display:block;touch-action:none;border-radius:12px}
@@ -195,6 +196,32 @@ function emo(s,x,y,size){ctx.font=`${size}px ${EFONT}`;ctx.textAlign='center';ct
 function rr(x,y,w,h,r){
   ctx.beginPath();r=Math.max(0,Math.min(r,w/2,h/2));
   ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+
+/* ---------- Wobblebyte Games logo ---------- */
+const WB_BODY=new Path2D('M40 30C60 6 140 6 160 30C185 28 199 70 191 105C185 131 150 129 135 106C120 92 80 92 65 106C50 129 15 131 9 105C1 70 15 28 40 30Z');
+function wbMark(x,y,w,wob=0){
+  const s=w/200;
+  ctx.save();ctx.translate(x,y);ctx.rotate(Math.sin(wob)*.05);ctx.scale(s*(1+Math.sin(wob*2)*.02),s*(1-Math.sin(wob*2)*.02));ctx.translate(-100,-68);
+  ctx.save();ctx.translate(5,8);ctx.fillStyle='#2a0f5e';ctx.fill(WB_BODY);ctx.restore();
+  ctx.fillStyle='#ff3d9a';ctx.fill(WB_BODY);
+  ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(26,36);ctx.bezierCurveTo(40,22,70,18,92,19);ctx.stroke();
+  ctx.fillStyle='#c6ff3d';rr(45,48,12,36,3);ctx.fill();rr(33,60,36,12,3);ctx.fill();
+  ctx.fillStyle='#35e0ff';ctx.beginPath();ctx.arc(147,52,9.5,0,7);ctx.fill();
+  ctx.fillStyle='#ffd23d';ctx.beginPath();ctx.arc(163,70,9.5,0,7);ctx.fill();
+  ctx.fillStyle='#fff';[89,111].forEach(ex=>{ctx.beginPath();ctx.arc(ex,54,9,0,7);ctx.fill()});
+  ctx.fillStyle='#2a0f5e';[91,113].forEach(ex=>{ctx.beginPath();ctx.arc(ex,56,4.5,0,7);ctx.fill()});
+  ctx.strokeStyle='#2a0f5e';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(88,74);ctx.quadraticCurveTo(100,86,112,74);ctx.stroke();
+  ctx.restore();
+}
+function wbLogo(cx,cy){
+  const w=44;ctx.font='400 18px "Lilita One","Arial Rounded MT Bold",'+FONT;
+  const a='Wobble',b='byte',wa=ctx.measureText(a).width,wb=ctx.measureText(b).width,tot=w+8+wa+wb,x0=cx-tot/2;
+  wbMark(x0+w/2,cy,w,G.tt*3);
+  ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=4;ctx.strokeStyle=INK;
+  const tx=x0+w+8;ctx.strokeText(a,tx,cy-4);ctx.fillStyle='#ff6fb5';ctx.fillText(a,tx,cy-4);
+  ctx.strokeText(b,tx+wa,cy-4);ctx.fillStyle='#c6ff3d';ctx.fillText(b,tx+wa,cy-4);
+  ctx.font='700 9px '+FONT;ctx.fillStyle='#fff';ctx.lineWidth=0;ctx.fillText('GAMES',tx+2,cy+12);
 }
 function pooka(x,y,r,col,mood='n'){
   ctx.save();ctx.translate(x,y);
@@ -1343,8 +1370,9 @@ function draw(){
     }
     COLS.slice(0,3).forEach((c,i)=>pooka(70+i*110,350+Math.sin(G.tt*3+i)*10,24,c,'h'));
     pooka(180,425-Math.abs(Math.sin(G.tt*3))*30,44,'#ff6fb5','h');
-    txt('TAP TO START',180,495,26+Math.sin(G.tt*5)*2);
-    txt(G.best?'Best: '+G.best:'29 microgames + bosses. 4 lives.',180,530,18,'#ffe45e');
+    txt('TAP TO START',180,478,26+Math.sin(G.tt*5)*2);
+    txt(G.best?'Best: '+G.best:'29 microgames + bosses. 4 lives.',180,508,18,'#ffe45e');
+    wbLogo(180,538);
   }else if(G.state==='intro'){
     if(G.banner)txt(G.banner,180+(G.boss?rnd(-3,3):0),170,36*(1+.1*Math.sin(G.tt*14)),G.boss?'#ff5252':'#ffe45e');
     const v=G.cur.verb||G.def.verb,k=Math.min(1,G.t/.15);
@@ -1369,7 +1397,8 @@ function draw(){
     txt('Score: '+G.score,180,400,34);
     txt(G.newBest?'NEW BEST!':'Best: '+G.best,180,445,24,'#ffe45e');
     if(G.t>.6)txt('TAP TO RETRY',180,500,26+Math.sin(G.tt*5)*2);
-    txt('Pooka Sprint by Chris Clifford',180,541,14,'#ffffff');
+    txt('Pooka Sprint by Chris Clifford',180,520,14,'#ffffff');
+    wbLogo(180,543);
   }
   emo(muted?'🔇':'🔊',336,26,22);
   ctx.restore();
